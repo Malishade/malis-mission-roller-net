@@ -21,6 +21,9 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <None Update="items.db">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="MissionLevels.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
