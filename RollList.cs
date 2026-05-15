@@ -7,38 +7,42 @@ public class RollList
         "AOSharp", "MalisMissionRoller", "rolllist.json"
     );
 
-    public List<ItemEntry> Items { get; private set; } = new();
+    public List<RollerItemEntry> Items { get; private set; } = new();
 
-    // ── Granular mutators ─────────────────────────────────────────────────────
 
-    public void Add(ItemEntry item)
+    public void Add(ItemE entry)
     {
-        var existing = Items.FirstOrDefault(i => i.LowId == item.LowId && i.HighId == item.HighId);
+        var existing = Items.FirstOrDefault(i => i.Item == entry);
+
         if (existing != null)
+        {
             existing.Count++;
+        }
         else
         {
-            item.Count = 1;
-            Items.Add(item);
+            Items.Add(new RollerItemEntry
+            {
+                Count = 1,
+                Item = entry
+            });
         }
+
         Save();
     }
 
-    public void Remove(int lowId, int highId)
+    public void Remove(ItemE entry)
     {
-        Items.RemoveAll(i => i.LowId == lowId && i.HighId == highId);
+        Items.RemoveAll(i => i.Item == entry);
         Save();
     }
 
-    public void AdjustCount(int lowId, int highId, int delta)
+    public void SetCount(ItemE entry, int count)
     {
-        var item = Items.FirstOrDefault(i => i.LowId == lowId && i.HighId == highId);
+        var item = Items.FirstOrDefault(i => i.Item == entry);
         if (item == null) return;
-        item.Count = Math.Max(1, item.Count + delta);
+        item.Count = count;
         Save();
     }
-
-    // ── Persistence ───────────────────────────────────────────────────────────
 
     public void Save()
     {
@@ -48,7 +52,7 @@ public class RollList
 
     public static RollList Load()
     {
-        try { return new RollList { Items = JsonConvert.DeserializeObject<List<ItemEntry>>(File.ReadAllText(Path)) }; }
+        try { return new RollList { Items = JsonConvert.DeserializeObject<List<RollerItemEntry>>(File.ReadAllText(Path)) }; }
         catch { return new RollList(); }
     }
 }

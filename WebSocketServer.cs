@@ -1,4 +1,5 @@
 using AOSharp.Core.UI;
+using Newtonsoft.Json;
 using System.Net;
 using System.Net.WebSockets;
 using System.Text;
@@ -11,26 +12,28 @@ public class WebSocketServer
     private readonly CancellationTokenSource _cts = new();
     private Task _listenerTask;
 
-    // ── Events ───────────────────────────────────────────────────────────────
     public event Action OnClientConnected;
     public event Action OnStart;
     public event Action OnStop;
 
-    // Settings
     public event Action<string> OnToggleMissionType;
     public event Action<string> OnToggleExtra;
-    public event Action<int, int> OnSetSlider;          // (index, value)
-    public event Action<int> OnTogglePlayfield;    // pfId
-    public event Action<int> OnRemoveBounds;       // pfId
-    public event Action<int> OnStartBounds;        // pfId
-    public event Action<int> OnConfirmBounds;      // pfId
+    public event Action<int, float> OnSetSlider;
+    public event Action<int> OnTogglePlayfield;
+    public event Action<int> OnRemoveBounds;
+    public event Action OnStartBounds;
+    public event Action OnConfirmBounds;
+    public event Action OnEnableAllPlayfields;
+    public event Action OnDisableAllPlayfields;
 
-    // Roll list
-    public event Action<ItemEntry> OnAddRollItem;
-    public event Action<int, int> OnRemoveRollItem;     // (lowId, highId)
-    public event Action<int, int, int> OnAdjustRollCount;    // (lowId, highId, delta)
+    public event Action<ItemE> OnAddRollItem;
+    public event Action<ItemE> OnRemoveRollItem;
+    public event Action<ItemE, int> OnSetRollCount;
+    public event Action<int, int, int, int, int> OnSetBounds;
 
-    public WebSocketServer(int port)
+    public event Action<string> OnSaveLayout;
+
+    public WebSocketServer(int port = 7069)
     {
         _listener = new HttpListener();
         _listener.Prefixes.Add($"http://localhost:{port}/");
@@ -81,7 +84,6 @@ public class WebSocketServer
 
     public void Stop()
     {
-        // 1. break event references
         OnClientConnected = null;
         OnStart = null;
         OnStop = null;
@@ -94,14 +96,12 @@ public class WebSocketServer
         OnConfirmBounds = null;
         OnAddRollItem = null;
         OnRemoveRollItem = null;
-        OnAdjustRollCount = null;
+        OnSetRollCount = null;
+        OnSaveLayout = null;
 
-        // 2. stop listener
         _cts.Cancel();
-
         try { _listener.Stop(); } catch { }
 
-        // 3. close clients
         foreach (var c in _clients)
         {
             try
@@ -114,8 +114,6 @@ public class WebSocketServer
         }
 
         _clients.Clear();
-
-        // 4. wait for background task
         try { _listenerTask?.Wait(1000); } catch { }
     }
 
@@ -131,12 +129,13 @@ public class WebSocketServer
                 if (result.Count == 0 || result.MessageType == WebSocketMessageType.Close) break;
 
                 var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                var doc = JsonDocument.Parse(json);
+                var doc  = JsonDocument.Parse(json);
                 var root = doc.RootElement;
+
+                Chat.WriteLine(json);
 
                 switch (root.GetProperty("type").GetString())
                 {
-                    // ── Settings ──────────────────────────────────────────────
                     case "toggleMissionType":
                         OnToggleMissionType?.Invoke(root.GetProperty("value").GetString());
                         break;
@@ -148,7 +147,7 @@ public class WebSocketServer
                     case "setSlider":
                         OnSetSlider?.Invoke(
                             root.GetProperty("index").GetInt32(),
-                            root.GetProperty("value").GetInt32()
+                            root.GetProperty("value").GetSingle()
                         );
                         break;
 
@@ -160,38 +159,55 @@ public class WebSocketServer
                         OnRemoveBounds?.Invoke(root.GetProperty("playfieldId").GetInt32());
                         break;
 
+                    case "enableAllPlayfields":
+                        OnEnableAllPlayfields?.Invoke();
+                        break;
+
+                    case "disableAllPlayfields":
+                        OnDisableAllPlayfields?.Invoke();
+                        break;
+
                     case "startBounds":
-                        OnStartBounds?.Invoke(root.GetProperty("playfieldId").GetInt32());
+                        OnStartBounds?.Invoke();
                         break;
 
                     case "confirmBounds":
-                        OnConfirmBounds?.Invoke(root.GetProperty("playfieldId").GetInt32());
+                        OnConfirmBounds?.Invoke();
                         break;
 
-                    // ── Roll list ─────────────────────────────────────────────
                     case "addRollItem":
-                        var item = JsonSerializer.Deserialize<ItemEntry>(
-                            root.GetProperty("item").GetRawText()
-                        );
-                        OnAddRollItem?.Invoke(item);
+                        //var item = JsonConvert.DeserializeObject<ItemE>(
+                        //    root.GetProperty("item").GetRawText()
+                        //);
+                        OnAddRollItem?.Invoke(JsonConvert.DeserializeObject<ItemE>(root.GetProperty("item").GetRawText()));
                         break;
 
                     case "removeRollItem":
-                        OnRemoveRollItem?.Invoke(
-                            root.GetProperty("lowId").GetInt32(),
-                            root.GetProperty("highId").GetInt32()
-                        );
+                        //OnRemoveRollItem?.Invoke(
+                        //    root.GetProperty("lowId").GetInt32(),
+                        //    root.GetProperty("highId").GetInt32()
+                        //);
+                        OnRemoveRollItem.Invoke(JsonConvert.DeserializeObject<ItemE>(root.GetProperty("item").GetRawText()));
                         break;
 
-                    case "adjustRollCount":
-                        OnAdjustRollCount?.Invoke(
-                            root.GetProperty("lowId").GetInt32(),
-                            root.GetProperty("highId").GetInt32(),
-                            root.GetProperty("delta").GetInt32()
+                    case "setRollCount":
+                        //OnSetRollCount?.Invoke(
+                        //    root.GetProperty("lowId").GetInt32(),
+                        //    root.GetProperty("highId").GetInt32(),
+                        //    root.GetProperty("count").GetInt32()
+                        //);
+
+                        OnSetRollCount?.Invoke(JsonConvert.DeserializeObject<ItemE>(root.GetProperty("item").GetRawText()), root.GetProperty("count").GetInt32());
+                        break;
+                    case "setBounds":
+                        OnSetBounds?.Invoke(
+                            root.GetProperty("playfieldId").GetInt32(),
+                            root.GetProperty("x1").GetInt32(),
+                            root.GetProperty("y1").GetInt32(),
+                            root.GetProperty("x2").GetInt32(),
+                            root.GetProperty("y2").GetInt32()
                         );
                         break;
-
-                    // ── Roller control ────────────────────────────────────────
                     case "start":
                         OnStart?.Invoke();
                         break;
@@ -199,12 +215,15 @@ public class WebSocketServer
                     case "stop":
                         OnStop?.Invoke();
                         break;
+
+                    case "saveLayout":
+                        OnSaveLayout?.Invoke(json);
+                        break;
                 }
             }
             catch (Exception ex)
             {
                 Chat.WriteLine($"HandleClient error: {ex.Message}");
-                break;
             }
         }
 

@@ -1,45 +1,48 @@
 using AOSharp.Common.GameData;
 using AOSharp.Core;
 using AOSharp.Core.UI;
+using Newtonsoft.Json;
 using SmokeLounge.AOtomation.Messaging.GameData;
-using System.Text.Json;
 
 public class Main : AOPluginEntry
 {
     private static MissionRoller _roller;
     private static BoundsProcessor _boundsProcessor;
     private static WebSocketServer _server;
+    private static AoDbServer _dbServer;
     private static RollList _rollList;
     private static RollerSettings _settings;
-    private static AoDbServer _aoDbServer;
+    private static LayoutSettings _layout;
     private static int? _pendingBoundsPfId;
 
     public override void Run()
     {
-        Chat.WriteLine("Mali's Mission Roller - Net");
-        Chat.WriteLine("hnmnge");
-        _aoDbServer = new AoDbServer($"{PluginDirectory}\\items.db");
-        _aoDbServer.Start();
+        Chat.WriteLine("Mali's Mission oller - Net");
 
-        //RollListProcessor.Init(PluginDirectory);
+        RollListProcessor.Init(PluginDirectory);
+        _dbServer = new AoDbServer($"{PluginDirectory}\\items.db");
+        _dbServer.Start();
 
-        ////_settings = RollerSettings.Load();
-        //_boundsProcessor = new BoundsProcessor();
-        //_roller = new MissionRoller();
-        //_rollList = RollList.Load();
-        //_server = new WebSocketServer(7069);
+        _settings = RollerSettings.Load();
+        _rollList = RollList.Load();
+        _layout = LayoutSettings.Load();
 
-        //HookServerEvents();
-        //Mission.RollListChanged += OnRollListChanged;
+        _roller = new MissionRoller(_settings);
+        _roller.UpdateItems(_rollList.Items);
+        _boundsProcessor = new BoundsProcessor();
+        _server = new WebSocketServer();
 
-        //_server.Start();
-        //AODBItemServer.StartServer();
+        HookServerEvents();
+        Mission.RollListChanged += OnRollListChanged;
+
+        _server.Start();
     }
 
     private static void HookServerEvents()
     {
         _server.OnClientConnected += () =>
         {
+            _server.Broadcast(_layout.ToJson());
             BroadcastState();
             BroadcastRollList();
         };
@@ -81,37 +84,64 @@ public class Main : AOPluginEntry
             BroadcastRollList();
         };
 
-        _server.OnRemoveRollItem += (lowId, highId) =>
+        _server.OnRemoveRollItem += item =>
         {
-            _rollList.Remove(lowId, highId);
+            _rollList.Remove(item);
             _roller.UpdateItems(_rollList.Items);
             BroadcastRollList();
         };
 
-        _server.OnAdjustRollCount += (lowId, highId, delta) =>
+        _server.OnSetRollCount += (item, count) =>
         {
-            _rollList.AdjustCount(lowId, highId, delta);
+            _rollList.SetCount(item, count);
             _roller.UpdateItems(_rollList.Items);
             BroadcastRollList();
         };
-
-        _server.OnStartBounds += pfId =>
+        
+        _server.OnStartBounds += () =>
         {
-            _pendingBoundsPfId = pfId;
+            _pendingBoundsPfId = Playfield.ModelIdentity.Instance;
             _boundsProcessor.Start();
         };
 
-        _server.OnConfirmBounds += pfId =>
+        _server.OnConfirmBounds += () =>
         {
-            if (_pendingBoundsPfId != pfId)
+            if (_pendingBoundsPfId == null)
                 return;
 
-            _pendingBoundsPfId = null;
-
             _boundsProcessor.Stop(out Vector3 startPos, out Vector3 endPos);
-            _settings.UpdateLocation(pfId, startPos, endPos);
+            _settings.UpdateLocation(_pendingBoundsPfId.Value, startPos, endPos);
+
+            _pendingBoundsPfId = null;
+            BroadcastState();
+        };
+
+        _server.OnSetBounds += (pfId, x1, y1, x2, y2) =>
+        {
+            _settings.UpdateLocation(pfId, x1, y1, x2, y2);
+            BroadcastState();
+        };
+
+
+        _server.OnEnableAllPlayfields += () =>
+        {
+            foreach (var id in _settings.Locations.Keys)
+                _settings.EnablePlayfield(id, true);
 
             BroadcastState();
+        };
+
+        _server.OnDisableAllPlayfields += () =>
+        {
+            foreach (var id in _settings.Locations.Keys)
+                _settings.EnablePlayfield(id, false);
+
+            BroadcastState();
+        };
+
+        _server.OnSaveLayout += (json) =>
+        {
+            _layout.Save(json);
         };
 
         _server.OnStart += () => _roller.Start();
@@ -120,7 +150,7 @@ public class Main : AOPluginEntry
 
     private static void BroadcastState()
     {
-        _server.Broadcast(JsonSerializer.Serialize(new
+        _server.Broadcast(JsonConvert.SerializeObject(new
         {
             type = "state",
             settings = _settings
@@ -129,13 +159,12 @@ public class Main : AOPluginEntry
 
     private static void BroadcastRollList()
     {
-        _server.Broadcast(JsonSerializer.Serialize(new
+        _server.Broadcast(JsonConvert.SerializeObject(new
         {
             type = "rollListState",
             items = _rollList.Items
         }));
     }
-
     private static void OnRollListChanged(object sender, RollListChangedArgs e)
     {
         _roller.ResetTick();
@@ -147,16 +176,22 @@ public class Main : AOPluginEntry
     {
         var list = missions.Select(m => new
         {
+            icon = m.MissionIcon,
             id = m.MissionIdentity.Instance,
             name = m.Title,
             playfield = m.Playfield.Instance.ToString(),
             credits = m.Credits,
             creditsMax = m.Credits,
             xp = m.XpReward,
-            rewards = m.MissionItemData?.Select(r => r.LowId).ToArray() ?? []
+            description = m.Description,
+            rewards = m.MissionItemData?.Select(r => new
+            {
+                ids = new[] { r.LowId, r.HighId },
+                ql = r.Ql
+            }).ToArray() ?? Array.Empty<object>()
         });
 
-        return JsonSerializer.Serialize(new
+        return JsonConvert.SerializeObject(new
         {
             type = "missionResults",
             missions = list
@@ -166,11 +201,10 @@ public class Main : AOPluginEntry
     public override void Teardown()
     {
         Chat.WriteLine("Shutting down...");
-        _aoDbServer.Stop();
-        //_roller?.Stop();
-        //_server?.Stop();
-        //AODBItemServer.StopServer();
-        //Mission.RollListChanged -= OnRollListChanged;
+        _roller?.Stop();
+        _server?.Stop();
+        _dbServer?.Stop();
+        Mission.RollListChanged -= OnRollListChanged;
     }
 }
 

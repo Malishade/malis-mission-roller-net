@@ -7,15 +7,44 @@ using SmokeLounge.AOtomation.Messaging.Messages.N3Messages;
 
 public class MissionRoller
 {
+    private RollerSettings _settings;
     private readonly AutoResetInterval _rollTick = new(1500);
-    private List<ItemEntry> _items = new();
+    private List<RollerItemEntry> _rollerEntries = new();
+    private List<ItemE> _items => _rollerEntries.Select(x => x.Item).ToList();
+    private bool _started = false;
 
-    public void Start() => Game.OnUpdate += OnUpdate;
-    public void Stop() => Game.OnUpdate -= OnUpdate;
+    public MissionRoller(RollerSettings settings)
+    {
+        _settings = settings;
+    }
 
-    public void UpdateItems(List<ItemEntry> items) => _items = items;
+    public void Start()
+    {
+        if (_started)
+            return;
 
-    public void ResetTick() => _rollTick.Reset();
+        Game.OnUpdate += OnUpdate;
+        _started = true;
+    }
+
+    public void Stop()
+    {
+        if (!_started)
+            return;
+
+        Game.OnUpdate -= OnUpdate;
+        _started = false;
+    }
+
+    public void UpdateItems(List<RollerItemEntry> items)
+    {
+        _rollerEntries = items;
+    }
+
+    public void ResetTick()
+    {
+        _rollTick.Reset();
+    }
 
     public void CheckHits(IEnumerable<MissionInfo> missions)
     {
@@ -27,10 +56,31 @@ public class MissionRoller
 
     private void OnUpdate(object sender, float e)
     {
-        if (!_rollTick.Elapsed) return;
+        if (!_rollTick.Elapsed)
+            return;
 
-        if (RollListProcessor.TryGetDifficultySliderValue(_items, out var difficultyValue))
-            RollerTerminal.Use(difficultyValue);
+        byte difficultyValue;
+
+        if (_settings.AutoAdjustLvlSlider)
+        {
+            if (!RollListProcessor.TryGetDifficultySliderValue(_items, out difficultyValue))
+            {
+                Chat.WriteLine("No valid items to roll");
+                return;
+            }
+        }
+        else
+        {
+            if (!RollListProcessor.HasValidRoll((byte)_settings.EasyHard, _items))
+            {
+                Chat.WriteLine("No valid items to roll");
+                return;
+            }
+
+            difficultyValue = (byte)_settings.EasyHard;
+        }
+
+        RollerTerminal.Use(difficultyValue);
     }
 }
 

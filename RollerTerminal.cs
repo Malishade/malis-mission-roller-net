@@ -19,7 +19,7 @@ public class RollerTerminal
 
         if (closestTerminal.DistanceFrom(DynelManager.LocalPlayer) > 7f)
         {
-            Chat.WriteLine("Too far away. Move closed to the terminal");
+            Chat.WriteLine("Too far away. Move closer to the terminal");
             return;
         }
 

@@ -2,25 +2,50 @@ using AOSharp.Common.GameData;
 using AOSharp.Core;
 using AOSharp.Core.Inventory;
 using AOSharp.Core.UI;
+using Newtonsoft.Json;
 using SmokeLounge.AOtomation.Messaging.GameData;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
-public class ItemEntry
+public class ItemE
 {
-    [JsonPropertyName("low_id")] public int LowId { get; set; }
-    [JsonPropertyName("high_id")] public int HighId { get; set; }
-    [JsonPropertyName("ql")] public int Ql { get; set; }
-    [JsonPropertyName("count")] public int Count { get; set; }
+    [JsonProperty("ids")] public int[] Ids { get; set; }
+    [JsonProperty("ql")] public int Ql { get; set; }
+    [JsonProperty("max_ql")] public int MaxQl { get; set; }
 
     [JsonIgnore] private string? _name;
-    [JsonIgnore] public string? Name => _name ??= Item.TryGet(LowId, HighId, Ql, out ACGItem item) ? item.Name : null;
+    [JsonIgnore] public string? Name => _name ??= Item.TryGet(Ids[0], Ids[1], Ql, out ACGItem item) ? item.Name : null;
 
+
+    public override bool Equals(object? obj)
+    {
+        if (ReferenceEquals(this, obj))
+            return true;
+
+        return obj is ItemE other &&
+               Ids.SequenceEqual(other.Ids);
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+
+        foreach (var id in Ids)
+            hash.Add(id);
+
+        hash.Add(Ql);
+
+        return hash.ToHashCode();
+    }
+}
+
+public class RollerItemEntry
+{
+    [JsonProperty("item")] public ItemE Item { get; set; }
+    [JsonProperty("count")] public int Count { get; set; }
 }
 
 public static class RollListProcessor
 {
-    private const int SpecialCreditItemId = 297315;
     private const int NanoCrystalTolerance = 10;
     private const int MaxQl = 200;
     private static List<List<int>> _missionLvlsRaw;
@@ -32,7 +57,7 @@ public static class RollListProcessor
         {
             var path = $"{pluginDir}\\MissionLevels.json";
             var json = File.ReadAllText(path);
-            _missionLvlsRaw = JsonSerializer.Deserialize<List<List<int>>>(json);
+            _missionLvlsRaw = JsonConvert.DeserializeObject<List<List<int>>>(json);
 
         }
         catch (Exception ex)
@@ -43,70 +68,74 @@ public static class RollListProcessor
 
     }
 
-    public static IEnumerable<Identity> Check(IEnumerable<MissionInfo> missions, IEnumerable<ItemEntry> items)
+    public static IEnumerable<Identity> Check(IEnumerable<MissionInfo> missions, IEnumerable<ItemE> items)
     {
         return missions
             .Where(mission => items.Any(item => MissionContainsItem(mission, item)))
             .Select(mission => mission.MissionIdentity);
     }
 
-    private static bool MissionContainsItem(MissionInfo mission, ItemEntry item)
+    private static bool MissionContainsItem(MissionInfo mission, ItemE item)
     {
-        return mission.MissionItemData.Any(e => e.HighId == item.HighId && e.Ql == item.Ql) ||
+        return mission.MissionItemData.Any(e => (item.Ids.Contains(e.HighId) || item.Ids.Contains(e.LowId)) && e.Ql == item.Ql) ||
               item.Name != null && mission.Description.Contains(item.Name);
     }
-    public static bool TryGetDifficultySliderValue(IEnumerable<ItemEntry> items, out byte value)
+
+    public static bool TryGetDifficultySliderValue(IEnumerable<ItemE> items, out byte value)
     {
         value = 0;
 
-        var item = FindNextRollable(items);
-
-        if (item == null)
+        if (!FindNextRollable(items, out var item))
             return false;
-
-        if (item.LowId == SpecialCreditItemId)
-        {
-            value = (byte)_missionLevels.IndexOf(item.Ql);
-            return true;
-        }
 
         var missionLevel = DetermineMissionLevel(item);
         value = (byte)(_missionLevels.IndexOf(missionLevel) + 1);
         return true;
     }
 
-    private static ItemEntry FindNextRollable(IEnumerable<ItemEntry> items)
+    private static bool FindNextRollable(IEnumerable<ItemE> items, out ItemE? item)
     {
-        return items.FirstOrDefault(item => IsRollable(item));
+        item = items.Where(IsRollable).OrderBy(x => x.Ql).FirstOrDefault();
+
+        if (item == null)
+            return false;
+
+        return true;
     }
 
-    private static bool IsRollable(ItemEntry item)
+    public static bool HasValidRoll(byte difficulty, IEnumerable<ItemE> items)
     {
-        if (item.LowId == SpecialCreditItemId)
-            return true;
-
-        if (DynelManager.LocalPlayer.Level > MaxQl && item.Ql == MaxQl && !IsNanoCrystal(item.Name))
-            return true;
-
-        return _missionLevels.Any(lvl => IsQlMatch(item.Ql, lvl, IsNanoCrystal(item.Name)));
+        return items.Any(x => IsRollable(difficulty, x));
     }
 
-    private static int DetermineMissionLevel(ItemEntry item)
+    private static bool IsRollable(byte difficulty, ItemE item)
     {
-        if (DynelManager.LocalPlayer.Level > MaxQl && item.Ql == MaxQl && !IsNanoCrystal(item.Name))
+        return IsQlMatch(item, _missionLevels[difficulty], IsNanoCrystal(item.Name));
+    }
+
+    private static bool IsRollable(ItemE item)
+    {
+        return _missionLevels.Any(lvl => IsQlMatch(item, lvl, IsNanoCrystal(item.Name)));
+    }
+
+    private static int DetermineMissionLevel(ItemE item)
+    {
+        if (item.Ql == MaxQl && item.MaxQl == MaxQl && _missionLevels.Any(lvl => lvl >= MaxQl) && !IsNanoCrystal(item.Name))
             return _missionLevels.First(lvl => lvl >= MaxQl);
 
         return _missionLevels.OrderBy(lvl => Math.Abs(lvl - item.Ql)).First();
     }
 
-    private static bool IsQlMatch(int itemQl, int missionLevel, bool isNanoCrystal)
+    private static bool IsQlMatch(ItemE item, int missionLevel, bool isNanoCrystal)
     {
-        return isNanoCrystal ? IsWithinNanoCrystalRange(itemQl, missionLevel) : itemQl == missionLevel;
+        return isNanoCrystal ? IsWithinNanoCrystalRange(item.Ql, missionLevel) : item.Ql == missionLevel || item.Ql == MaxQl  && item.MaxQl == MaxQl && missionLevel >= 200;
     }
+
     private static bool IsWithinNanoCrystalRange(int itemQl, int missionLevel)
     {
         return Math.Abs(itemQl - missionLevel) <= NanoCrystalTolerance;
     }
+
     private static bool IsNanoCrystal(string? name)
     {
         if (name == null)
