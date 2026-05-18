@@ -16,13 +16,23 @@ public class ItemE
     [JsonIgnore] public string? Name => _name ??= Item.TryGet(Ids[0], Ids[1], Ql, out ACGItem item) ? item.Name : null;
 
 
+    public static bool operator ==(ItemE? a, ItemE? b)
+    {
+        if (a is null && b is null) return true;
+        if (a is null || b is null) return false;
+        return a.Equals(b);
+    }
+
+    public static bool operator !=(ItemE? a, ItemE? b) => !(a == b);
+
     public override bool Equals(object? obj)
     {
         if (ReferenceEquals(this, obj))
             return true;
 
         return obj is ItemE other &&
-               Ids.SequenceEqual(other.Ids);
+               Ids.SequenceEqual(other.Ids) &&
+               Ql == other.Ql;
     }
 
     public override int GetHashCode()
