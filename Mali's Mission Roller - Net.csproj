@@ -31,4 +31,5 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+  <ProjectExtensions><VisualStudio><UserProperties manifest_1json__JsonSchema="https://www.schemastore.org/function.json" /></VisualStudio></ProjectExtensions>
 </Project>

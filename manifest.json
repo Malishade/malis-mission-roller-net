@@ -2,4 +2,5 @@
   "author": "Malishade",
   "description": "Mission Roller",
   "dependencies": [ "https://github.com/Malishade/aoitemqueryservice" ]
+  "section": "Utility"
 }
