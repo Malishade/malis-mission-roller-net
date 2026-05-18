@@ -100,24 +100,3 @@ public class DbFilters
     [JsonProperty("reqFilter", ObjectCreationHandling = ObjectCreationHandling.Replace)]
     public List<StatFilterEntry> ReqFilter { get; set; } = new();
 }
-
-public class StatFilterEntry
-{
-    [JsonProperty("statId")] public int StatId { get; set; }
-    [JsonProperty("min")] public int? Min { get; set; }
-    [JsonProperty("max")] public int? Max { get; set; }
-    [JsonProperty("enabled")] public bool Enabled { get; set; } = true;
-}
-
-public class ModFilterEntry
-{
-    [JsonProperty("uid")] public string Uid { get; set; }
-    [JsonProperty("modType")] public string ModType { get; set; }
-    [JsonProperty("enabled")] public bool Enabled { get; set; } = true;
-
-    // Only present for "stat" and "lock" types
-    [JsonProperty("statId")] public int? StatId { get; set; }
-
-    [JsonProperty("min")] public int? Min { get; set; }
-    [JsonProperty("max")] public int? Max { get; set; }
-}

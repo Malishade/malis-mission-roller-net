@@ -10,7 +10,7 @@ public class MissionRoller
     private RollerSettings _settings;
     private readonly AutoResetInterval _rollTick = new(1500);
     private List<RollerItemEntry> _rollerEntries = new();
-    private List<ItemE> _items => _rollerEntries.Select(x => x.Item).ToList();
+    private List<ItemEntry> _items => _rollerEntries.Select(x => x.Item).ToList();
     private bool _started = false;
 
     public MissionRoller(RollerSettings settings)

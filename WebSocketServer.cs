@@ -26,9 +26,9 @@ public class WebSocketServer
     public event Action OnEnableAllPlayfields;
     public event Action OnDisableAllPlayfields;
 
-    public event Action<ItemE> OnAddRollItem;
-    public event Action<ItemE> OnRemoveRollItem;
-    public event Action<ItemE, int> OnSetRollCount;
+    public event Action<ItemEntry> OnAddRollItem;
+    public event Action<ItemEntry> OnRemoveRollItem;
+    public event Action<ItemEntry, int> OnSetRollCount;
     public event Action<int, int, int, int, int> OnSetBounds;
 
     public event Action<string> OnSaveLayout;
@@ -176,28 +176,15 @@ public class WebSocketServer
                         break;
 
                     case "addRollItem":
-                        //var item = JsonConvert.DeserializeObject<ItemE>(
-                        //    root.GetProperty("item").GetRawText()
-                        //);
-                        OnAddRollItem?.Invoke(JsonConvert.DeserializeObject<ItemE>(root.GetProperty("item").GetRawText()));
+                        OnAddRollItem?.Invoke(JsonConvert.DeserializeObject<ItemEntry>(root.GetProperty("item").GetRawText()));
                         break;
 
                     case "removeRollItem":
-                        //OnRemoveRollItem?.Invoke(
-                        //    root.GetProperty("lowId").GetInt32(),
-                        //    root.GetProperty("highId").GetInt32()
-                        //);
-                        OnRemoveRollItem.Invoke(JsonConvert.DeserializeObject<ItemE>(root.GetProperty("item").GetRawText()));
+                        OnRemoveRollItem.Invoke(JsonConvert.DeserializeObject<ItemEntry>(root.GetProperty("item").GetRawText()));
                         break;
 
                     case "setRollCount":
-                        //OnSetRollCount?.Invoke(
-                        //    root.GetProperty("lowId").GetInt32(),
-                        //    root.GetProperty("highId").GetInt32(),
-                        //    root.GetProperty("count").GetInt32()
-                        //);
-
-                        OnSetRollCount?.Invoke(JsonConvert.DeserializeObject<ItemE>(root.GetProperty("item").GetRawText()), root.GetProperty("count").GetInt32());
+                        OnSetRollCount?.Invoke(JsonConvert.DeserializeObject<ItemEntry>(root.GetProperty("item").GetRawText()), root.GetProperty("count").GetInt32());
                         break;
                     case "setBounds":
                         OnSetBounds?.Invoke(

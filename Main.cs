@@ -9,7 +9,7 @@ public class Main : AOPluginEntry
     private static MissionRoller _roller;
     private static BoundsProcessor _boundsProcessor;
     private static WebSocketServer _server;
-    private static AoDbServer _dbServer;
+    private static AOItemQueryService _itemService;
     private static RollList _rollList;
     private static RollerSettings _settings;
     private static LayoutSettings _layout;
@@ -17,11 +17,11 @@ public class Main : AOPluginEntry
 
     public override void Run()
     {
-        Chat.WriteLine("Mali's Mission oller - Net");
+        Chat.WriteLine("Mali's Mission Roller - Net");
 
         RollListProcessor.Init(PluginDirectory);
-        _dbServer = new AoDbServer($"{PluginDirectory}\\items.db");
-        _dbServer.Start();
+        _itemService = new AOItemQueryService(Server.Retail);
+        _itemService.Start();
 
         _settings = RollerSettings.Load();
         _rollList = RollList.Load();
@@ -203,7 +203,7 @@ public class Main : AOPluginEntry
         Chat.WriteLine("Shutting down...");
         _roller?.Stop();
         _server?.Stop();
-        _dbServer?.Stop();
+        _itemService?.Stop();
         Mission.RollListChanged -= OnRollListChanged;
     }
 }

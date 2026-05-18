@@ -10,7 +10,7 @@ public class RollList
     public List<RollerItemEntry> Items { get; private set; } = new();
 
 
-    public void Add(ItemE entry)
+    public void Add(ItemEntry entry)
     {
         var existing = Items.FirstOrDefault(i => i.Item == entry);
 
@@ -30,13 +30,13 @@ public class RollList
         Save();
     }
 
-    public void Remove(ItemE entry)
+    public void Remove(ItemEntry entry)
     {
         Items.RemoveAll(i => i.Item == entry);
         Save();
     }
 
-    public void SetCount(ItemE entry, int count)
+    public void SetCount(ItemEntry entry, int count)
     {
         var item = Items.FirstOrDefault(i => i.Item == entry);
         if (item == null) return;
