@@ -1,5 +1,5 @@
 {
   "author": "Malishade",
   "description": "Mission Roller",
-  "dependencies": []
+  "dependencies": [ "https://github.com/Malishade/aoitemqueryservice" ]
 }
