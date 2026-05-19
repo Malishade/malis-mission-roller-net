@@ -34,7 +34,6 @@ public class Main : AOPluginEntry
 
         HookServerEvents();
         Mission.RollListChanged += OnRollListChanged;
-
         _server.Start();
     }
 

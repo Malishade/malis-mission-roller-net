@@ -17,10 +17,10 @@
     <HintPath>..\AOItemQueryService\bin\Debug\net10.0-windows\win-x86\AOItemQueryService.dll</HintPath>
   </Reference>
   <Reference Include="AOSharp.Common">
-    <HintPath>..\AOSharp.Net3\bin\Release\net10.0-windows\Plugins\AOSharp.Common\AOSharp.Common.dll</HintPath>
+    <HintPath>..\AOSharp.Net\bin\Release\net10.0-windows\Plugins\AOSharp.Common\AOSharp.Common.dll</HintPath>
   </Reference>
   <Reference Include="AOSharp.Core">
-    <HintPath>..\AOSharp.Net3\bin\Release\net10.0-windows\Plugins\AOSharp.Core\AOSharp.Core.dll</HintPath>
+    <HintPath>..\AOSharp.Net\bin\Release\net10.0-windows\Plugins\AOSharp.Core\AOSharp.Core.dll</HintPath>
   </Reference>
 </ItemGroup>
   <ItemGroup>
